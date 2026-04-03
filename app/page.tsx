@@ -76,7 +76,7 @@ export default function HomePage() {
       } else {
         setResult(data);
       }
-    } catch (err) {
+    } catch {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -92,18 +92,21 @@ export default function HomePage() {
   function openLeadModal() {
     setLeadSalonName(salonName.trim());
     setSubmitted(false);
+    setEmail("");
     setIsModalOpen(true);
   }
 
   async function handleLeadFormSubmit(e: FormEvent) {
     e.preventDefault();
-  
+
     const trimmedEmail = email.trim();
     const trimmedLeadSalonName = leadSalonName.trim();
     const trimmedPostcode = postcode.trim();
-  
-    if (!trimmedEmail || !trimmedLeadSalonName) return;
-  
+
+    if (!trimmedEmail || !trimmedLeadSalonName) {
+      return;
+    }
+
     try {
       const res = await fetch("https://formspree.io/f/mdapwzkl", {
         method: "POST",
@@ -117,14 +120,15 @@ export default function HomePage() {
           postcode: trimmedPostcode,
         }),
       });
-  
+
       if (!res.ok) {
-        throw new Error("Failed to submit form");
+        throw new Error("Failed to submit");
       }
-  
+
       setSubmitted(true);
       setEmail("");
     } catch (err) {
+      console.error(err);
       setError("Could not submit your email. Please try again.");
     }
   }
@@ -133,17 +137,18 @@ export default function HomePage() {
   const reviewCount = result?.salon.reviewCount ?? 0;
   const visibility = getVisibilityLevel(rating, reviewCount);
 
-  // simple benchmark proxy for now
   const competitorAverageReviews = Math.max(reviewCount + 80, 180);
   const reviewGap = Math.max(0, competitorAverageReviews - reviewCount);
 
-  // simple commercial impact proxy
   const lostClientsLow = Math.max(4, Math.round(reviewGap / 10));
   const lostClientsHigh = Math.max(10, Math.round(reviewGap / 4.5));
   const lostRevenueLow = lostClientsLow * 40;
   const lostRevenueHigh = lostClientsHigh * 80;
 
-  const actionTargetReviews = Math.min(30, Math.max(12, Math.round(reviewGap / 3)));
+  const actionTargetReviews = Math.min(
+    30,
+    Math.max(12, Math.round(reviewGap / 3))
+  );
 
   return (
     <>
@@ -318,8 +323,8 @@ export default function HomePage() {
 
                   <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-5">
                     <p className="text-sm font-medium text-amber-900">
-                      You are likely losing clients to nearby salons with stronger
-                      Google profiles.
+                      You are likely losing clients to nearby salons with
+                      stronger Google profiles.
                     </p>
 
                     <div className="mt-4 rounded-xl border border-amber-200 bg-white/70 p-4">
@@ -353,8 +358,8 @@ export default function HomePage() {
                         in the next 30 days
                       </li>
                       <li>
-                        Respond to <strong>all recent reviews</strong> to improve
-                        trust signals
+                        Respond to <strong>all recent reviews</strong> to
+                        improve trust signals
                       </li>
                       <li>
                         Push your profile above{" "}
@@ -363,7 +368,6 @@ export default function HomePage() {
                     </ul>
                   </div>
 
-                  {/* Soft paywall: paid = ongoing system that fixes the problem shown above */}
                   <div className="mt-6 rounded-2xl border border-violet-200/90 bg-gradient-to-br from-violet-950 via-violet-900 to-neutral-900 p-6 text-white shadow-lg shadow-violet-900/20">
                     <p className="text-xs font-semibold uppercase tracking-wider text-violet-200">
                       Growth system
@@ -405,14 +409,13 @@ export default function HomePage() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => openLeadModal()}
+                      onClick={openLeadModal}
                       className="mt-4 w-full rounded-xl bg-white px-5 py-3.5 text-sm font-semibold text-violet-950 shadow-md transition hover:bg-violet-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                     >
                       Start My Growth System
                     </button>
                   </div>
 
-                  {/* Free vs paid at a glance */}
                   <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4">
                     <div className="grid grid-cols-2 gap-4 text-xs sm:text-sm">
                       <div>
@@ -447,7 +450,6 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Lead capture modal — opens from “Start My Growth System” */}
       {isModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -483,7 +485,10 @@ export default function HomePage() {
                   Google visibility.
                 </p>
 
-                <form className="mt-6 space-y-4" onSubmit={handleLeadFormSubmit}>
+                <form
+                  className="mt-6 space-y-4"
+                  onSubmit={handleLeadFormSubmit}
+                >
                   <div>
                     <label
                       htmlFor="lead-email"
@@ -502,6 +507,7 @@ export default function HomePage() {
                       autoComplete="email"
                     />
                   </div>
+
                   <div>
                     <label
                       htmlFor="lead-salon"
@@ -519,6 +525,7 @@ export default function HomePage() {
                       autoComplete="organization"
                     />
                   </div>
+
                   <button
                     type="submit"
                     className="w-full rounded-xl bg-neutral-900 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
@@ -531,11 +538,9 @@ export default function HomePage() {
               <div className="pr-8 pt-1">
                 <p
                   id="lead-modal-title"
-                  className="text-base font-medium leading-relaxed text-neutral-900"
+                  className="text-base font-medium leading-relaxed text-neutral-900 whitespace-pre-line"
                 >
-                  You&apos;re in.
-
-                  We&apos;ll send your first growth plan soon. Check your email.    
+                  {"You're in.\n\nWe'll send your first growth plan soon. Check your email."}
                 </p>
               </div>
             )}

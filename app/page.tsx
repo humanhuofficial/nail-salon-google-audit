@@ -95,16 +95,38 @@ export default function HomePage() {
     setIsModalOpen(true);
   }
 
-  function handleLeadFormSubmit(e: FormEvent) {
+  async function handleLeadFormSubmit(e: FormEvent) {
     e.preventDefault();
   
-    console.log("Lead capture:", {
-      email: email.trim(),
-      salonName: leadSalonName.trim(),
-    });
+    const trimmedEmail = email.trim();
+    const trimmedLeadSalonName = leadSalonName.trim();
+    const trimmedPostcode = postcode.trim();
   
-    setSubmitted(true);
-    setEmail("");
+    if (!trimmedEmail || !trimmedLeadSalonName) return;
+  
+    try {
+      const res = await fetch("https://formspree.io/f/mdapwzkl", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          salonName: trimmedLeadSalonName,
+          postcode: trimmedPostcode,
+        }),
+      });
+  
+      if (!res.ok) {
+        throw new Error("Failed to submit form");
+      }
+  
+      setSubmitted(true);
+      setEmail("");
+    } catch (err) {
+      setError("Could not submit your email. Please try again.");
+    }
   }
 
   const rating = result?.salon.rating ?? 0;
@@ -379,7 +401,7 @@ export default function HomePage() {
                       </li>
                     </ul>
                     <p className="mt-5 text-sm font-medium text-white">
-                      Start from £19/month
+                      Free early access
                     </p>
                     <button
                       type="button"
@@ -511,7 +533,9 @@ export default function HomePage() {
                   id="lead-modal-title"
                   className="text-base font-medium leading-relaxed text-neutral-900"
                 >
-                  You&apos;re on the list. We&apos;ll notify you soon.
+                  You&apos;re in.
+
+                  We&apos;ll send your first growth plan soon. Check your email.    
                 </p>
               </div>
             )}

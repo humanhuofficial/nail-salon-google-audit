@@ -15,7 +15,10 @@ type SalonResult = {
 
 type VisibilityLevel = "HIGH" | "MEDIUM" | "LOW";
 
-function getVisibilityLevel(rating: number, reviewCount: number): VisibilityLevel {
+function getVisibilityLevel(
+  rating: number,
+  reviewCount: number
+): VisibilityLevel {
   if (reviewCount >= 150 && rating >= 4.5) return "HIGH";
   if (reviewCount >= 60 && rating >= 4.2) return "MEDIUM";
   return "LOW";
@@ -78,8 +81,18 @@ export default function HomePage() {
   const rating = result?.salon.rating ?? 0;
   const reviewCount = result?.salon.reviewCount ?? 0;
   const visibility = getVisibilityLevel(rating, reviewCount);
+
+  // simple benchmark proxy for now
   const competitorAverageReviews = Math.max(reviewCount + 80, 180);
   const reviewGap = Math.max(0, competitorAverageReviews - reviewCount);
+
+  // simple commercial impact proxy
+  const lostClientsLow = Math.max(4, Math.round(reviewGap / 10));
+  const lostClientsHigh = Math.max(10, Math.round(reviewGap / 4.5));
+  const lostRevenueLow = lostClientsLow * 40;
+  const lostRevenueHigh = lostClientsHigh * 80;
+
+  const actionTargetReviews = Math.min(30, Math.max(12, Math.round(reviewGap / 3)));
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-white">
@@ -94,12 +107,11 @@ export default function HomePage() {
             UK nail salons · Google Maps growth
           </p>
           <h1 className="text-balance text-4xl font-semibold tracking-tight text-neutral-900 sm:text-5xl sm:leading-[1.1]">
-            Get More Clients from Google Maps — or See Why You&apos;re Losing
-            Them
+            Get More Clients from Google Maps — or See Why You&apos;re Losing Them
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-neutral-600 sm:text-xl">
-            Instantly compare your nail salon with nearby competitors and see
-            how many clients you might be missing.
+            Instantly compare your nail salon with nearby competitors and see how
+            many clients you might be missing.
           </p>
         </header>
 
@@ -163,7 +175,7 @@ export default function HomePage() {
                 </h2>
                 <p className="mt-4 max-w-md text-neutral-600">
                   Enter your salon name and postcode to compare your Google
-                  profile strength and review gap.
+                  profile strength, visibility level, and review gap.
                 </p>
               </div>
             )}
@@ -193,7 +205,6 @@ export default function HomePage() {
                   Improve your Google visibility
                 </h2>
 
-                {/* A. Current Profile */}
                 <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
                   <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
                     Current profile
@@ -204,6 +215,7 @@ export default function HomePage() {
                   <p className="mt-1 text-sm leading-relaxed text-neutral-600">
                     {result.salon.address}
                   </p>
+
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-xl border border-neutral-200 bg-white p-4">
                       <p className="text-sm text-neutral-500">Rating</p>
@@ -211,6 +223,7 @@ export default function HomePage() {
                         {result.salon.rating || 0}
                       </p>
                     </div>
+
                     <div className="rounded-xl border border-neutral-200 bg-white p-4">
                       <p className="text-sm text-neutral-500">Review count</p>
                       <p className="mt-1 text-2xl font-semibold text-neutral-900">
@@ -220,7 +233,6 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* B. Visibility Summary */}
                 <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 p-5">
                   <p className="text-xs font-semibold uppercase tracking-wider text-violet-700">
                     Visibility summary
@@ -233,7 +245,6 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                {/* C. Review Gap */}
                 <div className="mt-5 rounded-2xl border border-neutral-200 bg-white p-5">
                   <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
                     Review gap
@@ -252,23 +263,62 @@ export default function HomePage() {
                   </ul>
                 </div>
 
-                {/* D. Business Impact Message */}
                 <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-5">
                   <p className="text-sm font-medium text-amber-900">
                     You are likely losing clients to nearby salons with stronger
                     Google profiles.
                   </p>
+
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-white/70 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">
+                      Estimated impact
+                    </p>
+                    <ul className="mt-3 space-y-2 text-sm text-neutral-800">
+                      <li>
+                        Lost clients per month:{" "}
+                        <strong>
+                          {lostClientsLow}–{lostClientsHigh}
+                        </strong>
+                      </li>
+                      <li>
+                        Potential lost revenue:{" "}
+                        <strong>
+                          £{lostRevenueLow}–£{lostRevenueHigh}+
+                        </strong>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
 
-                {/* E. Upgrade Teaser */}
+                <div className="mt-5 rounded-2xl border border-neutral-200 bg-white p-5">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                    What you should do next
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm text-neutral-700">
+                    <li>
+                      Get <strong>{actionTargetReviews}–30 new reviews</strong> in
+                      the next 30 days
+                    </li>
+                    <li>
+                      Respond to <strong>all recent reviews</strong> to improve
+                      trust signals
+                    </li>
+                    <li>
+                      Push your profile above{" "}
+                      <strong>4.5 rating + stronger review volume</strong>
+                    </li>
+                  </ul>
+                </div>
+
                 <div className="mt-5 rounded-2xl border border-neutral-200 bg-gradient-to-br from-neutral-50 to-violet-50/60 p-5">
                   <p className="text-sm font-medium text-neutral-900">
-                    Want to improve your ranking?
+                    Unlock weekly growth system
                   </p>
-                  <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-                    Get weekly reports, review growth tips, and automated reply
-                    suggestions.
-                  </p>
+                  <ul className="mt-3 space-y-2 text-sm leading-relaxed text-neutral-600">
+                    <li>• Get weekly performance reports</li>
+                    <li>• Track your review growth</li>
+                    <li>• Get ready-to-use reply templates</li>
+                  </ul>
                 </div>
               </div>
             )}

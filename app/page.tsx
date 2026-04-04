@@ -55,24 +55,13 @@ async function runAudit(input: {
 export default function Page() {
   const [salonName, setSalonName] = useState("");
   const [postcode, setPostcode] = useState("");
-  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [submittingEmail, setSubmittingEmail] = useState(false);
   const [result, setResult] = useState<AuditResult | null>(null);
   const [error, setError] = useState("");
-  const [emailError, setEmailError] = useState("");
-  const [showLeadModal, setShowLeadModal] = useState(false);
-  const [leadCaptured, setLeadCaptured] = useState(false);
 
   const isFormValid = useMemo(() => {
     return salonName.trim().length > 1 && postcode.trim().length > 2;
   }, [salonName, postcode]);
-
-  const hiddenActions = [
-    "Why nearby salons outrank you",
-    "How to recover free clients from Google",
-    "How to reduce reliance on Treatwell and other platforms",
-  ];
 
   async function handleAnalyze(e: React.FormEvent) {
     e.preventDefault();
@@ -87,52 +76,11 @@ export default function Page() {
         postcode: postcode.trim(),
       });
       setResult(data);
-      setLeadCaptured(false);
     } catch (err) {
       console.error(err);
       setError("Could not analyze this salon right now. Please try again.");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleEmailSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!email.trim()) {
-      setEmailError("Please enter your email.");
-      return;
-    }
-
-    setSubmittingEmail(true);
-    setEmailError("");
-
-    try {
-      // Replace this with your real Formspree endpoint.
-      // Example:
-      // const res = await fetch("https://formspree.io/f/your-id", {
-      //   method: "POST",
-      //   headers: {
-      //     Accept: "application/json",
-      //     "Content-Type": "application/json",
-      //   },
-      //   body: JSON.stringify({
-      //     email,
-      //     salonName,
-      //     postcode,
-      //     result,
-      //   }),
-      // });
-      // if (!res.ok) throw new Error("Lead capture failed");
-
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      setLeadCaptured(true);
-      setShowLeadModal(false);
-    } catch (err) {
-      console.error(err);
-      setEmailError("Could not submit email. Please try again.");
-    } finally {
-      setSubmittingEmail(false);
     }
   }
 
@@ -269,70 +217,19 @@ export default function Page() {
               />
             </div>
 
-            <div className="mt-8 grid gap-6 lg:grid-cols-2">
-              <div className="rounded-3xl border border-neutral-200 bg-neutral-50 p-6">
-                <h4 className="text-lg font-semibold">Why this is happening</h4>
-                <ul className="mt-4 space-y-3 text-sm leading-6 text-neutral-700">
-                  <li>
-                    Nearby salons have around{" "}
-                    {result.competitorsReviewAverage} reviews on average.
-                  </li>
-                  <li>You are behind by about {result.reviewGap} reviews.</li>
-                  <li>
-                    That makes it easier for clients to trust competitors first.
-                  </li>
-                </ul>
-              </div>
-
-              <div className="rounded-3xl border border-neutral-200 bg-neutral-50 p-6">
-                <h4 className="text-lg font-semibold">What happens next</h4>
-                <div className="mt-4 space-y-3">
-                  {hiddenActions.map((item) => (
-                    <div
-                      key={item}
-                      className="flex items-center justify-between rounded-2xl border border-dashed border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-700"
-                    >
-                      <span>{item}</span>
-                      <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-500">
-                        Locked
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="mt-8 rounded-3xl border border-neutral-200 bg-neutral-50 p-6">
+              <h4 className="text-lg font-semibold">Why this is happening</h4>
+              <ul className="mt-4 space-y-3 text-sm leading-6 text-neutral-700">
+                <li>
+                  Nearby salons have around{" "}
+                  {result.competitorsReviewAverage} reviews on average.
+                </li>
+                <li>You are behind by about {result.reviewGap} reviews.</li>
+                <li>
+                  That makes it easier for clients to trust competitors first.
+                </li>
+              </ul>
             </div>
-
-            <div className="mt-8 rounded-3xl bg-neutral-900 p-6 text-white md:p-8">
-              <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm uppercase tracking-wide text-neutral-300">
-                    Free next step
-                  </p>
-                  <h4 className="mt-2 text-2xl font-bold">
-                    See exactly how to recover these clients
-                  </h4>
-                  <p className="mt-2 max-w-2xl text-neutral-300">
-                    Get your full growth plan by email: what is hurting your
-                    visibility, how to fix it, and how to reduce reliance on
-                    paid platforms.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowLeadModal(true)}
-                  className="rounded-2xl bg-white px-5 py-3 font-semibold text-neutral-900 transition hover:bg-neutral-100"
-                >
-                  Unlock my growth plan
-                </button>
-              </div>
-            </div>
-
-            {leadCaptured ? (
-              <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                Thanks — your growth plan request has been captured.
-              </div>
-            ) : null}
           </div>
         </section>
       ) : null}
@@ -393,73 +290,6 @@ export default function Page() {
         </div>
       </section>
 
-      {showLeadModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl md:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-2xl font-bold">Get your full growth plan</h3>
-                <p className="mt-2 text-sm leading-6 text-neutral-600">
-                  Enter your email to see why you are losing clients, what to
-                  fix first, and how to recover more direct bookings.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={() => setShowLeadModal(false)}
-                className="rounded-full border border-neutral-200 px-3 py-1 text-sm text-neutral-500 hover:bg-neutral-50"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form className="mt-6 space-y-4" onSubmit={handleEmailSubmit}>
-              <div>
-                <label
-                  htmlFor="email"
-                  className="mb-2 block text-sm font-medium text-neutral-700"
-                >
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@salon.com"
-                  className="w-full rounded-2xl border border-neutral-300 px-4 py-3 outline-none transition focus:border-neutral-900"
-                />
-              </div>
-
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
-                You will get:
-                <ul className="mt-2 list-disc space-y-1 pl-5">
-                  <li>What is hurting your visibility</li>
-                  <li>How to improve it step by step</li>
-                  <li>
-                    How to reduce reliance on commission platforms like
-                    Treatwell
-                  </li>
-                </ul>
-              </div>
-
-              <button
-                type="submit"
-                disabled={submittingEmail}
-                className="w-full rounded-2xl bg-neutral-900 px-5 py-3 font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {submittingEmail ? "Submitting..." : "Send my growth plan"}
-              </button>
-
-              {emailError ? (
-                <p className="text-sm text-red-600">{emailError}</p>
-              ) : null}
-            </form>
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }

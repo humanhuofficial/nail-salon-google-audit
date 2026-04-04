@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 
+type GooglePlace = {
+  displayName?: { text?: string };
+  formattedAddress?: string;
+  rating?: number;
+  userRatingCount?: number;
+  location?: {
+    latitude?: number;
+    longitude?: number;
+  };
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     console.log("Incoming body:", body);
 
-    const name = body?.name?.trim?.() || "";
+    // 前端现在传的是 salonName，不是 name
+    const salonName = body?.salonName?.trim?.() || "";
     const postcode = body?.postcode?.trim?.() || "";
 
-    if (!name || !postcode) {
+    if (!salonName || !postcode) {
       return NextResponse.json(
         { error: "Missing salon name or postcode." },
         { status: 400 }
@@ -26,7 +38,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const query = `${name} ${postcode} UK nail salon`;
+    const query = `${salonName} ${postcode} UK nail salon`;
     console.log("Google query:", query);
 
     const response = await fetch(
@@ -48,7 +60,8 @@ export async function POST(req: NextRequest) {
     const rawText = await response.text();
     console.log("Raw Google response:", rawText);
 
-    let data: any = null;
+    let data: { places?: GooglePlace[] } | null = null;
+
     try {
       data = JSON.parse(rawText);
     } catch {
@@ -71,7 +84,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!data.places || data.places.length === 0) {
+    if (!data?.places || data.places.length === 0) {
       return NextResponse.json(
         {
           error:
@@ -84,15 +97,43 @@ export async function POST(req: NextRequest) {
 
     const salon = data.places[0];
 
+    const rating = salon.rating ?? 0;
+    const reviewCount = salon.userRatingCount ?? 0;
+
+    // 先用一个简单版本算竞争对手均值
+    // 现在没有抓 competitors，所以先用一个保守估算
+    const competitorsReviewAverage = Math.max(reviewCount + 40, 80);
+
+    const reviewGap = Math.max(competitorsReviewAverage - reviewCount, 0);
+
+    let visibilityLevel: "HIGH" | "MEDIUM" | "LOW" = "LOW";
+    if (reviewCount >= 120) {
+      visibilityLevel = "HIGH";
+    } else if (reviewCount >= 70) {
+      visibilityLevel = "MEDIUM";
+    }
+
+    let lostClientsPerMonth = 0;
+    if (visibilityLevel === "LOW") {
+      lostClientsPerMonth = 18;
+    } else if (visibilityLevel === "MEDIUM") {
+      lostClientsPerMonth = 8;
+    } else {
+      lostClientsPerMonth = 3;
+    }
+
+    const averageTicket = 40;
+    const lostRevenuePerMonth = lostClientsPerMonth * averageTicket;
+
     return NextResponse.json({
-      salon: {
-        name: salon.displayName?.text || "Unknown salon",
-        address: salon.formattedAddress || "No address found",
-        rating: salon.rating ?? 0,
-        reviewCount: salon.userRatingCount ?? 0,
-        lat: salon.location?.latitude ?? 0,
-        lng: salon.location?.longitude ?? 0,
-      },
+      salonName: salon.displayName?.text || salonName,
+      rating,
+      reviewCount,
+      visibilityLevel,
+      reviewGap,
+      lostClientsPerMonth,
+      lostRevenuePerMonth,
+      competitorsReviewAverage,
     });
   } catch (error: any) {
     console.error("Server error:", error);

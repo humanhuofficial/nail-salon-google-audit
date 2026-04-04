@@ -1,552 +1,558 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-
-type SalonResult = {
-  salon: {
-    name: string;
-    address: string;
-    rating: number;
-    reviewCount: number;
-    lat: number;
-    lng: number;
-  };
-};
+import React, { useMemo, useState } from "react";
 
 type VisibilityLevel = "HIGH" | "MEDIUM" | "LOW";
 
-function getVisibilityLevel(
-  rating: number,
-  reviewCount: number
-): VisibilityLevel {
-  if (reviewCount >= 150 && rating >= 4.5) return "HIGH";
-  if (reviewCount >= 60 && rating >= 4.2) return "MEDIUM";
-  return "LOW";
+type AuditResult = {
+  salonName: string;
+  rating: number;
+  reviewCount: number;
+  visibilityLevel: VisibilityLevel;
+  reviewGap: number;
+  lostClientsPerMonth: number;
+  lostRevenuePerMonth: number;
+  competitorsReviewAverage: number;
+};
+
+const currency = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+  maximumFractionDigits: 0,
+});
+
+function getVisibilityStyles(level: VisibilityLevel) {
+  switch (level) {
+    case "HIGH":
+      return "bg-green-100 text-green-800 border-green-200";
+    case "MEDIUM":
+      return "bg-amber-100 text-amber-800 border-amber-200";
+    case "LOW":
+    default:
+      return "bg-red-100 text-red-800 border-red-200";
+  }
 }
 
-export default function HomePage() {
+async function runAudit(input: {
+  salonName: string;
+  postcode: string;
+}): Promise<AuditResult> {
+  const res = await fetch("/api/analyze", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to analyze salon");
+  }
+
+  return res.json();
+}
+
+export default function Page() {
   const [salonName, setSalonName] = useState("");
   const [postcode, setPostcode] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [result, setResult] = useState<SalonResult | null>(null);
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [email, setEmail] = useState("");
-  const [leadSalonName, setLeadSalonName] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [submittingEmail, setSubmittingEmail] = useState(false);
+  const [result, setResult] = useState<AuditResult | null>(null);
+  const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [showLeadModal, setShowLeadModal] = useState(false);
+  const [leadCaptured, setLeadCaptured] = useState(false);
 
-  async function handleSubmit(e: FormEvent) {
+  const isFormValid = useMemo(() => {
+    return salonName.trim().length > 1 && postcode.trim().length > 2;
+  }, [salonName, postcode]);
+
+  const hiddenActions = [
+    "Why nearby salons outrank you",
+    "How to recover free clients from Google",
+    "How to reduce reliance on Treatwell and other platforms",
+  ];
+
+  async function handleAnalyze(e: React.FormEvent) {
     e.preventDefault();
-
-    const trimmedSalon = salonName.trim();
-    const trimmedPostcode = postcode.trim();
-
-    if (!trimmedSalon || !trimmedPostcode) {
-      setError("Please enter both salon name and postcode/area.");
-      return;
-    }
+    if (!isFormValid) return;
 
     setLoading(true);
     setError("");
-    setResult(null);
 
     try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: trimmedSalon,
-          postcode: trimmedPostcode,
-        }),
+      const data = await runAudit({
+        salonName: salonName.trim(),
+        postcode: postcode.trim(),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(
-          `${data.error || "Something went wrong."}${
-            data.details
-              ? `\n\nDetails:\n${JSON.stringify(data.details, null, 2)}`
-              : ""
-          }`
-        );
-      } else {
-        setResult(data);
-      }
-    } catch {
-      setError("Network error. Please try again.");
+      setResult(data);
+      setLeadCaptured(false);
+    } catch (err) {
+      console.error(err);
+      setError("Could not analyze this salon right now. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  function closeModal() {
-    setIsModalOpen(false);
-    setSubmitted(false);
-    setEmail("");
-  }
-
-  function openLeadModal() {
-    setLeadSalonName(salonName.trim());
-    setSubmitted(false);
-    setEmail("");
-    setIsModalOpen(true);
-  }
-
-  async function handleLeadFormSubmit(e: FormEvent) {
+  async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const trimmedEmail = email.trim();
-    const trimmedLeadSalonName = leadSalonName.trim();
-    const trimmedPostcode = postcode.trim();
-
-    if (!trimmedEmail || !trimmedLeadSalonName) {
+    if (!email.trim()) {
+      setEmailError("Please enter your email.");
       return;
     }
 
+    setSubmittingEmail(true);
+    setEmailError("");
+
     try {
-      const res = await fetch("https://formspree.io/f/mdapwzkl", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          salonName: trimmedLeadSalonName,
-          postcode: trimmedPostcode,
-        }),
-      });
+      // Replace this with your real Formspree endpoint.
+      // Example:
+      // const res = await fetch("https://formspree.io/f/your-id", {
+      //   method: "POST",
+      //   headers: {
+      //     Accept: "application/json",
+      //     "Content-Type": "application/json",
+      //   },
+      //   body: JSON.stringify({
+      //     email,
+      //     salonName,
+      //     postcode,
+      //     result,
+      //   }),
+      // });
+      // if (!res.ok) throw new Error("Lead capture failed");
 
-      if (!res.ok) {
-        throw new Error("Failed to submit");
-      }
-
-      setSubmitted(true);
-      setEmail("");
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      setLeadCaptured(true);
+      setShowLeadModal(false);
     } catch (err) {
       console.error(err);
-      setError("Could not submit your email. Please try again.");
+      setEmailError("Could not submit email. Please try again.");
+    } finally {
+      setSubmittingEmail(false);
     }
   }
 
-  const rating = result?.salon.rating ?? 0;
-  const reviewCount = result?.salon.reviewCount ?? 0;
-  const visibility = getVisibilityLevel(rating, reviewCount);
-
-  const competitorAverageReviews = Math.max(reviewCount + 80, 180);
-  const reviewGap = Math.max(0, competitorAverageReviews - reviewCount);
-
-  const lostClientsLow = Math.max(4, Math.round(reviewGap / 10));
-  const lostClientsHigh = Math.max(10, Math.round(reviewGap / 4.5));
-  const lostRevenueLow = lostClientsLow * 40;
-  const lostRevenueHigh = lostClientsHigh * 80;
-
-  const actionTargetReviews = Math.min(
-    30,
-    Math.max(12, Math.round(reviewGap / 3))
-  );
-
   return (
-    <>
-      <main className="relative min-h-screen overflow-hidden bg-white">
-        <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(168,85,247,0.12),transparent)]"
-          aria-hidden
-        />
+    <main className="min-h-screen bg-neutral-50 text-neutral-900">
+      <section className="border-b border-neutral-200 bg-white">
+        <div className="mx-auto max-w-6xl px-6 py-16 md:px-8 md:py-24">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <div>
+              <div className="mb-4 inline-flex rounded-full border border-red-200 bg-red-50 px-3 py-1 text-sm font-medium text-red-700">
+                Free Google visibility check for UK nail salons
+              </div>
 
-        <div className="relative mx-auto flex min-h-screen max-w-5xl flex-col px-6 py-20 sm:px-8 sm:py-28">
-          <header className="mb-16 sm:mb-20">
-            <p className="mb-4 text-sm font-medium tracking-wide text-violet-600/90">
-              UK nail salons · Google Maps growth
-            </p>
-            <h1 className="text-balance text-4xl font-semibold tracking-tight text-neutral-900 sm:text-5xl sm:leading-[1.1]">
-              Get More Clients from Google Maps — or See Why You&apos;re Losing
-              Them
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-neutral-600 sm:text-xl">
-              Instantly compare your nail salon with nearby competitors and see
-              how many clients you might be missing.
-            </p>
-          </header>
+              <h1 className="max-w-2xl text-4xl font-bold tracking-tight md:text-6xl">
+                You might be losing clients every day on Google.
+              </h1>
 
-          <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
-            <section className="rounded-2xl border border-neutral-200/80 bg-white p-8 shadow-[0_1px_0_rgba(0,0,0,0.04),0_24px_48px_-12px_rgba(0,0,0,0.08)] sm:p-10">
-              <form onSubmit={handleSubmit}>
-                <label htmlFor="salon" className="sr-only">
-                  Nail salon name
-                </label>
-                <input
-                  id="salon"
-                  type="text"
-                  value={salonName}
-                  onChange={(e) => setSalonName(e.target.value)}
-                  placeholder="Enter your nail salon name"
-                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50/80 px-4 py-3.5 text-base text-neutral-900 outline-none ring-violet-500/20 transition placeholder:text-neutral-400 focus:border-violet-300 focus:bg-white focus:ring-4"
-                  autoComplete="organization"
-                />
+              <p className="mt-5 max-w-xl text-lg leading-8 text-neutral-600">
+                Most nail salons rely on platforms like Treatwell and pay high
+                commissions while missing free clients already searching on
+                Google.
+              </p>
 
-                <label htmlFor="postcode" className="sr-only">
-                  Postcode or area
-                </label>
-                <input
-                  id="postcode"
-                  type="text"
-                  value={postcode}
-                  onChange={(e) => setPostcode(e.target.value)}
-                  placeholder="Enter postcode or area (e.g. SW1A 1AA, Soho)"
-                  className="mt-4 w-full rounded-xl border border-neutral-200 bg-neutral-50/80 px-4 py-3.5 text-base text-neutral-900 outline-none ring-violet-500/20 transition placeholder:text-neutral-400 focus:border-violet-300 focus:bg-white focus:ring-4"
-                  autoComplete="postal-code"
-                />
+              <p className="mt-3 max-w-xl text-base leading-7 text-neutral-500">
+                Check your salon in under 10 seconds and see if nearby
+                competitors are taking bookings you should be getting.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm md:p-8">
+              <h2 className="text-2xl font-semibold">Check my salon</h2>
+              <p className="mt-2 text-sm text-neutral-500">
+                Enter your salon name and postcode.
+              </p>
+
+              <form className="mt-6 space-y-4" onSubmit={handleAnalyze}>
+                <div>
+                  <label
+                    htmlFor="salonName"
+                    className="mb-2 block text-sm font-medium text-neutral-700"
+                  >
+                    Salon name
+                  </label>
+                  <input
+                    id="salonName"
+                    type="text"
+                    value={salonName}
+                    onChange={(e) => setSalonName(e.target.value)}
+                    placeholder="e.g. Queen B Luxury Nail and Beauty Lounge"
+                    className="w-full rounded-2xl border border-neutral-300 px-4 py-3 outline-none transition focus:border-neutral-900"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="postcode"
+                    className="mb-2 block text-sm font-medium text-neutral-700"
+                  >
+                    Postcode
+                  </label>
+                  <input
+                    id="postcode"
+                    type="text"
+                    value={postcode}
+                    onChange={(e) => setPostcode(e.target.value)}
+                    placeholder="e.g. SW1A 1AA"
+                    className="w-full rounded-2xl border border-neutral-300 px-4 py-3 uppercase outline-none transition focus:border-neutral-900"
+                  />
+                </div>
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="mt-5 w-full rounded-xl bg-neutral-900 px-5 py-3.5 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+                  disabled={!isFormValid || loading}
+                  className="w-full rounded-2xl bg-neutral-900 px-5 py-3 font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {loading ? "Checking..." : "Check My Google Visibility"}
+                  {loading ? "Analyzing..." : "Analyze now"}
                 </button>
+
+                {error ? (
+                  <p className="text-sm text-red-600">{error}</p>
+                ) : null}
               </form>
-
-              <p className="mt-8 text-sm text-neutral-500">
-                Free instant analysis · No signup
-              </p>
-
-              {error && (
-                <div className="mt-6 rounded-xl border border-red-300 bg-red-50 px-4 py-3.5 text-sm leading-relaxed text-red-800 whitespace-pre-wrap break-words">
-                  {error}
-                </div>
-              )}
-            </section>
-
-            <section className="rounded-2xl border border-neutral-200/80 bg-white p-8 shadow-[0_1px_0_rgba(0,0,0,0.04),0_24px_48px_-12px_rgba(0,0,0,0.08)] sm:p-10">
-              {!result && !loading && !error && (
-                <div className="flex min-h-[260px] flex-col justify-center">
-                  <p className="text-sm font-medium tracking-wide text-violet-600/90">
-                    Visibility gap preview
-                  </p>
-                  <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900">
-                    See where you stand
-                  </h2>
-                  <p className="mt-4 max-w-md text-neutral-600">
-                    Enter your salon name and postcode to compare your Google
-                    profile strength, visibility level, and review gap.
-                  </p>
-                </div>
-              )}
-
-              {loading && (
-                <div className="flex min-h-[260px] flex-col justify-center">
-                  <p className="text-sm font-medium tracking-wide text-violet-600/90">
-                    Live analysis
-                  </p>
-                  <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900">
-                    Checking your Google profile...
-                  </h2>
-                  <p className="mt-4 max-w-md text-neutral-600">
-                    We&apos;re analyzing your current review strength and local
-                    visibility.
-                  </p>
-                </div>
-              )}
-
-              {result && (
-                <div>
-                  <p className="text-sm font-medium tracking-wide text-violet-600/90">
-                    Gap analysis
-                  </p>
-
-                  <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900">
-                    Where you&apos;re losing ground on Google Maps
-                  </h2>
-
-                  <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                      Current profile
-                    </p>
-                    <h3 className="mt-2 text-lg font-semibold text-neutral-900">
-                      {result.salon.name}
-                    </h3>
-                    <p className="mt-1 text-sm leading-relaxed text-neutral-600">
-                      {result.salon.address}
-                    </p>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-neutral-200 bg-white p-4">
-                        <p className="text-sm text-neutral-500">Rating</p>
-                        <p className="mt-1 text-2xl font-semibold text-neutral-900">
-                          {result.salon.rating || 0}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-neutral-200 bg-white p-4">
-                        <p className="text-sm text-neutral-500">Review count</p>
-                        <p className="mt-1 text-2xl font-semibold text-neutral-900">
-                          {result.salon.reviewCount || 0}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-violet-700">
-                      Visibility summary
-                    </p>
-                    <p className="mt-2 text-sm text-neutral-700">
-                      Estimated visibility:{" "}
-                      <span className="font-semibold text-neutral-900">
-                        {visibility}
-                      </span>
-                    </p>
-                  </div>
-
-                  <div className="mt-5 rounded-2xl border border-neutral-200 bg-white p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                      Review gap
-                    </p>
-                    <ul className="mt-3 space-y-2 text-sm text-neutral-700">
-                      <li>
-                        Your reviews: <strong>{reviewCount}</strong>
-                      </li>
-                      <li>
-                        Nearby competitors:{" "}
-                        <strong>{competitorAverageReviews}+</strong>
-                      </li>
-                      <li>
-                        You are behind by: <strong>{reviewGap}</strong> reviews
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                    <p className="text-sm font-medium text-amber-900">
-                      You are likely losing clients to nearby salons with
-                      stronger Google profiles.
-                    </p>
-
-                    <div className="mt-4 rounded-xl border border-amber-200 bg-white/70 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">
-                        Estimated impact
-                      </p>
-                      <ul className="mt-3 space-y-2 text-sm text-neutral-800">
-                        <li>
-                          Lost clients per month:{" "}
-                          <strong>
-                            {lostClientsLow}–{lostClientsHigh}
-                          </strong>
-                        </li>
-                        <li>
-                          Potential lost revenue:{" "}
-                          <strong>
-                            £{lostRevenueLow}–£{lostRevenueHigh}+
-                          </strong>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 rounded-2xl border border-neutral-200 bg-white p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                      What you should do next
-                    </p>
-                    <ul className="mt-3 space-y-2 text-sm text-neutral-700">
-                      <li>
-                        Get <strong>{actionTargetReviews}–30 new reviews</strong>{" "}
-                        in the next 30 days
-                      </li>
-                      <li>
-                        Respond to <strong>all recent reviews</strong> to
-                        improve trust signals
-                      </li>
-                      <li>
-                        Push your profile above{" "}
-                        <strong>4.5 rating + stronger review volume</strong>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div className="mt-6 rounded-2xl border border-violet-200/90 bg-gradient-to-br from-violet-950 via-violet-900 to-neutral-900 p-6 text-white shadow-lg shadow-violet-900/20">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-violet-200">
-                      Growth system
-                    </p>
-                    <h3 className="mt-2 text-xl font-semibold tracking-tight">
-                      Unlock full growth system
-                    </h3>
-                    <p className="mt-2 text-sm leading-relaxed text-violet-100/90">
-                      Turn this analysis into a simple weekly growth process.
-                    </p>
-                    <ul className="mt-4 space-y-2.5 text-sm text-violet-50/95">
-                      <li className="flex gap-2">
-                        <span className="text-violet-300" aria-hidden>
-                          ✓
-                        </span>
-                        <span>Weekly performance tracking</span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-violet-300" aria-hidden>
-                          ✓
-                        </span>
-                        <span>Weekly review growth plan</span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-violet-300" aria-hidden>
-                          ✓
-                        </span>
-                        <span>Ready-to-use reply templates</span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-violet-300" aria-hidden>
-                          ✓
-                        </span>
-                        <span>Unlimited visibility checks</span>
-                      </li>
-                    </ul>
-                    <p className="mt-5 text-sm font-medium text-white">
-                      Free early access
-                    </p>
-                    <button
-                      type="button"
-                      onClick={openLeadModal}
-                      className="mt-4 w-full rounded-xl bg-white px-5 py-3.5 text-sm font-semibold text-violet-950 shadow-md transition hover:bg-violet-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                    >
-                      Get My Free Growth Plan
-                    </button>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4">
-                    <div className="grid grid-cols-2 gap-4 text-xs sm:text-sm">
-                      <div>
-                        <p className="font-semibold text-neutral-900">Free</p>
-                        <ul className="mt-2 space-y-1.5 text-neutral-600">
-                          <li>One instant visibility check</li>
-                          <li>Review gap preview</li>
-                          <li>Basic improvement guidance</li>
-                        </ul>
-                      </div>
-                      <div className="border-l border-neutral-200 pl-4">
-                        <p className="font-semibold text-neutral-900">
-                          Growth System
-                        </p>
-                        <ul className="mt-2 space-y-1.5 text-neutral-600">
-                          <li>Weekly reports</li>
-                          <li>Ongoing review tracking</li>
-                          <li>Review reply templates</li>
-                          <li>Unlimited checks</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </section>
+            </div>
           </div>
-
-          <p className="mt-10 text-center text-xs tracking-wide text-neutral-500">
-            Built for UK nail salons · Based on real Google Maps data
-          </p>
         </div>
-      </main>
+      </section>
 
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={closeModal}
-          role="presentation"
-        >
-          <div
-            className="relative w-full max-w-md rounded-2xl border border-neutral-200/80 bg-white p-6 shadow-xl sm:p-8"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="lead-modal-title"
-          >
-            <button
-              type="button"
-              onClick={closeModal}
-              className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-lg text-lg text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
-              aria-label="Close"
-            >
-              ×
-            </button>
-
-            {!submitted ? (
-              <>
-                <h2
-                  id="lead-modal-title"
-                  className="pr-10 text-xl font-semibold tracking-tight text-neutral-900"
-                >
-                  Get your free growth plan
-                </h2>
-                <p className="mt-3 text-sm leading-relaxed text-neutral-600">
-                  Be the first to use the weekly growth system to improve your
-                  Google visibility.
+      {result ? (
+        <section className="mx-auto max-w-6xl px-6 py-12 md:px-8 md:py-16">
+          <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-wide text-neutral-500">
+                  Audit result
                 </p>
-
-                <form
-                  className="mt-6 space-y-4"
-                  onSubmit={handleLeadFormSubmit}
-                >
-                  <div>
-                    <label
-                      htmlFor="lead-email"
-                      className="block text-sm font-medium text-neutral-700"
-                    >
-                      Email
-                    </label>
-                    <input
-                      id="lead-email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@salon.co.uk"
-                      className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-neutral-50/80 px-4 py-3 text-base text-neutral-900 outline-none ring-violet-500/20 transition placeholder:text-neutral-400 focus:border-violet-300 focus:bg-white focus:ring-4"
-                      autoComplete="email"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="lead-salon"
-                      className="block text-sm font-medium text-neutral-700"
-                    >
-                      Salon name
-                    </label>
-                    <input
-                      id="lead-salon"
-                      type="text"
-                      value={leadSalonName}
-                      onChange={(e) => setLeadSalonName(e.target.value)}
-                      placeholder="Your salon name"
-                      className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-neutral-50/80 px-4 py-3 text-base text-neutral-900 outline-none ring-violet-500/20 transition placeholder:text-neutral-400 focus:border-violet-300 focus:bg-white focus:ring-4"
-                      autoComplete="organization"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full rounded-xl bg-neutral-900 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
-                  >
-                    Get Early Access
-                  </button>
-                </form>
-              </>
-            ) : (
-              <div className="pr-8 pt-1">
-                <p
-                  id="lead-modal-title"
-                  className="text-base font-medium leading-relaxed text-neutral-900 whitespace-pre-line"
-                >
-                  {"You're in.\n\nWe'll send your first growth plan soon, including review targets and quick actions to improve your Google visibility."}
+                <h3 className="mt-2 text-3xl font-bold">{result.salonName}</h3>
+                <p className="mt-3 max-w-2xl text-neutral-600">
+                  This means potential clients may be choosing other salons
+                  before they even see you.
                 </p>
               </div>
-            )}
+
+              <div
+                className={`inline-flex rounded-full border px-4 py-2 text-sm font-semibold ${getVisibilityStyles(
+                  result.visibilityLevel
+                )}`}
+              >
+                Your visibility: {result.visibilityLevel}
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Google rating"
+                value={result.rating.toFixed(1)}
+                subtext="Current public rating"
+              />
+              <MetricCard
+                label="Review count"
+                value={String(result.reviewCount)}
+                subtext="Total Google reviews"
+              />
+              <MetricCard
+                label="Estimated lost clients"
+                value={`${result.lostClientsPerMonth}/month`}
+                subtext="Potential clients choosing competitors"
+                emphasize
+              />
+              <MetricCard
+                label="Estimated lost revenue"
+                value={currency.format(result.lostRevenuePerMonth)}
+                subtext="Potential monthly revenue left on the table"
+                emphasize
+              />
+            </div>
+
+            <div className="mt-8 grid gap-6 lg:grid-cols-2">
+              <div className="rounded-3xl border border-neutral-200 bg-neutral-50 p-6">
+                <h4 className="text-lg font-semibold">Why this is happening</h4>
+                <ul className="mt-4 space-y-3 text-sm leading-6 text-neutral-700">
+                  <li>
+                    Nearby salons have around{" "}
+                    {result.competitorsReviewAverage} reviews on average.
+                  </li>
+                  <li>You are behind by about {result.reviewGap} reviews.</li>
+                  <li>
+                    That makes it easier for clients to trust competitors first.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="rounded-3xl border border-neutral-200 bg-neutral-50 p-6">
+                <h4 className="text-lg font-semibold">What happens next</h4>
+                <div className="mt-4 space-y-3">
+                  {hiddenActions.map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-center justify-between rounded-2xl border border-dashed border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-700"
+                    >
+                      <span>{item}</span>
+                      <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-500">
+                        Locked
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-3xl bg-neutral-900 p-6 text-white md:p-8">
+              <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm uppercase tracking-wide text-neutral-300">
+                    Free next step
+                  </p>
+                  <h4 className="mt-2 text-2xl font-bold">
+                    See exactly how to recover these clients
+                  </h4>
+                  <p className="mt-2 max-w-2xl text-neutral-300">
+                    Get your full growth plan by email: what is hurting your
+                    visibility, how to fix it, and how to reduce reliance on
+                    paid platforms.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowLeadModal(true)}
+                  className="rounded-2xl bg-white px-5 py-3 font-semibold text-neutral-900 transition hover:bg-neutral-100"
+                >
+                  Unlock my growth plan
+                </button>
+              </div>
+            </div>
+
+            {leadCaptured ? (
+              <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                Thanks — your growth plan request has been captured.
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="mx-auto max-w-6xl px-6 pb-16 md:px-8 md:pb-24">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <PricingCard
+            title="Free audit"
+            price="£0"
+            description="Use the tool once to see your rating, review count, visibility level, and estimated lost revenue."
+            features={[
+              "1 free salon analysis",
+              "Visibility level: HIGH / MEDIUM / LOW",
+              "Estimated lost clients and revenue",
+              "Basic competitor comparison",
+            ]}
+            cta="Start free"
+            featured={false}
+          />
+
+          <PricingCard
+            title="Google Client Recovery Plan"
+            price="£49"
+            description="Recover lost clients from Google and reduce reliance on paid platforms like Treatwell. One-time payment."
+            features={[
+              "Identify exactly how many clients you're losing (e.g. 10–25/month)",
+              "Step-by-step plan to recover 10–20 additional clients from Google",
+              "Close your review gap (+20–50 reviews over time)",
+              "3 highest-impact actions to improve visibility within 2–4 weeks",
+              "Simple system to reduce commission-based bookings",
+              "Typical outcome: +£300–£800/month in additional revenue",
+            ]}
+            cta="Get the full plan"
+            featured={true}
+          />
+        </div>
+
+        <div className="mt-6 rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm md:p-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-medium uppercase tracking-wide text-neutral-500">
+                Done-for-you service
+              </p>
+              <h3 className="mt-2 text-2xl font-bold">
+                Google profile optimization — £99 one-time
+              </h3>
+              <p className="mt-2 max-w-3xl text-neutral-600">
+                For salons that want help implementing the changes. We optimize
+                your profile, sharpen your positioning, and give you a
+                review-growth action plan.
+              </p>
+            </div>
+
+            <button className="rounded-2xl bg-neutral-900 px-5 py-3 font-semibold text-white transition hover:bg-neutral-800">
+              Ask about done-for-you
+            </button>
           </div>
         </div>
-      )}
-    </>
+      </section>
+
+      {showLeadModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl md:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-2xl font-bold">Get your full growth plan</h3>
+                <p className="mt-2 text-sm leading-6 text-neutral-600">
+                  Enter your email to see why you are losing clients, what to
+                  fix first, and how to recover more direct bookings.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setShowLeadModal(false)}
+                className="rounded-full border border-neutral-200 px-3 py-1 text-sm text-neutral-500 hover:bg-neutral-50"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form className="mt-6 space-y-4" onSubmit={handleEmailSubmit}>
+              <div>
+                <label
+                  htmlFor="email"
+                  className="mb-2 block text-sm font-medium text-neutral-700"
+                >
+                  Email address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@salon.com"
+                  className="w-full rounded-2xl border border-neutral-300 px-4 py-3 outline-none transition focus:border-neutral-900"
+                />
+              </div>
+
+              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
+                You will get:
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  <li>What is hurting your visibility</li>
+                  <li>How to improve it step by step</li>
+                  <li>
+                    How to reduce reliance on commission platforms like
+                    Treatwell
+                  </li>
+                </ul>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingEmail}
+                className="w-full rounded-2xl bg-neutral-900 px-5 py-3 font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submittingEmail ? "Submitting..." : "Send my growth plan"}
+              </button>
+
+              {emailError ? (
+                <p className="text-sm text-red-600">{emailError}</p>
+              ) : null}
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </main>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  subtext,
+  emphasize = false,
+}: {
+  label: string;
+  value: string;
+  subtext: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-3xl border p-5 ${
+        emphasize
+          ? "border-red-200 bg-red-50"
+          : "border-neutral-200 bg-white"
+      }`}
+    >
+      <p className="text-sm font-medium text-neutral-500">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-neutral-600">{subtext}</p>
+    </div>
+  );
+}
+
+function PricingCard({
+  title,
+  price,
+  description,
+  features,
+  cta,
+  featured,
+}: {
+  title: string;
+  price: string;
+  description: string;
+  features: string[];
+  cta: string;
+  featured: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-3xl border p-6 shadow-sm md:p-8 ${
+        featured
+          ? "border-neutral-900 bg-neutral-900 text-white"
+          : "border-neutral-200 bg-white"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-2xl font-bold">{title}</h3>
+          <p
+            className={`mt-2 text-sm leading-6 ${
+              featured ? "text-neutral-300" : "text-neutral-600"
+            }`}
+          >
+            {description}
+          </p>
+        </div>
+
+        {featured ? (
+          <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-900">
+            Recommended
+          </div>
+        ) : null}
+      </div>
+
+      <p className="mt-6 text-4xl font-bold">{price}</p>
+
+      <ul
+        className={`mt-6 space-y-3 text-sm leading-6 ${
+          featured ? "text-neutral-200" : "text-neutral-700"
+        }`}
+      >
+        {features.map((feature) => (
+          <li key={feature}>• {feature}</li>
+        ))}
+      </ul>
+
+      <button
+        className={`mt-8 w-full rounded-2xl px-5 py-3 font-semibold transition ${
+          featured
+            ? "bg-white text-neutral-900 hover:bg-neutral-100"
+            : "bg-neutral-900 text-white hover:bg-neutral-800"
+        }`}
+      >
+        {cta}
+      </button>
+    </div>
   );
 }

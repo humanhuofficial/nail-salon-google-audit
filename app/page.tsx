@@ -412,7 +412,7 @@ export default function HomePage() {
                       onClick={openLeadModal}
                       className="mt-4 w-full rounded-xl bg-white px-5 py-3.5 text-sm font-semibold text-violet-950 shadow-md transition hover:bg-violet-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                     >
-                      Start My Growth System
+                      Get My Free Growth Plan
                     </button>
                   </div>
 
@@ -478,7 +478,7 @@ export default function HomePage() {
                   id="lead-modal-title"
                   className="pr-10 text-xl font-semibold tracking-tight text-neutral-900"
                 >
-                  Get early access
+                  Get your free growth plan
                 </h2>
                 <p className="mt-3 text-sm leading-relaxed text-neutral-600">
                   Be the first to use the weekly growth system to improve your
@@ -540,7 +540,7 @@ export default function HomePage() {
                   id="lead-modal-title"
                   className="text-base font-medium leading-relaxed text-neutral-900 whitespace-pre-line"
                 >
-                  {"You're in.\n\nWe'll send your first growth plan soon. Check your email."}
+                  {"You're in.\n\nWe'll send your first growth plan soon, including review targets and quick actions to improve your Google visibility."}
                 </p>
               </div>
             )}

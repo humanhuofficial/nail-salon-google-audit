@@ -45,12 +45,15 @@ async function runAudit(input: {
     body: JSON.stringify(input),
   });
 
+  const data = await res.json();
+
   if (!res.ok) {
-    throw new Error("Failed to analyze salon");
+    throw new Error(data?.error || "Failed to analyze salon");
   }
 
-  return res.json();
+  return data;
 }
+
 
 export default function Page() {
   const [salonName, setSalonName] = useState("");
@@ -58,10 +61,91 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AuditResult | null>(null);
   const [error, setError] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState<
+    "plan49" | "done99" | null
+  >(null);
+  const [showLeadModal, setShowLeadModal] = useState(false);
+  const [leadEmail, setLeadEmail] = useState("");
+  const [leadSubmitting, setLeadSubmitting] = useState(false);
+  const [leadSuccess, setLeadSuccess] = useState(false);
 
   const isFormValid = useMemo(() => {
     return salonName.trim().length > 1 && postcode.trim().length > 2;
   }, [salonName, postcode]);
+
+  function scrollToAuditForm() {
+    document
+      .getElementById("audit-form")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openLeadModal(plan: "plan49" | "done99") {
+    setSelectedPlan(plan);
+    setLeadSuccess(false);
+    setLeadEmail("");
+    setShowLeadModal(true);
+  }
+
+  function closeLeadModal() {
+    setShowLeadModal(false);
+    setSelectedPlan(null);
+    setLeadSuccess(false);
+    setLeadEmail("");
+    setLeadSubmitting(false);
+  }
+
+  async function handleLeadSubmit(e: React.FormEvent) {
+  e.preventDefault();
+
+  if (!leadEmail.trim()) return;
+
+  setLeadSubmitting(true);
+
+  try {
+    const res = await fetch("https://formspree.io/f/mdapwzkl", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: leadEmail.trim(),
+        selectedPlan,
+        salonName: salonName.trim(),
+        postcode: postcode.trim(),
+        result,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to submit lead");
+    }
+
+    setLeadSuccess(true);
+    setLeadEmail("");
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLeadSubmitting(false);
+  }
+}
+
+
+
+  const modalCopy =
+    selectedPlan === "plan49"
+      ? {
+          title: "Google Client Recovery Plan — £49",
+          description:
+            "One-time plan to recover more clients from Google, close your review gap, and reduce reliance on commission platforms. Leave your details and we’ll follow up with next steps.",
+        }
+      : selectedPlan === "done99"
+        ? {
+            title: "Done-for-you profile optimization — £99",
+            description:
+              "We optimise your Google profile, sharpen positioning, and give you a clear review action plan. Tell us how to reach you and we’ll arrange a quick call or email.",
+          }
+        : { title: "", description: "" };
 
   async function handleAnalyze(e: React.FormEvent) {
     e.preventDefault();
@@ -76,15 +160,16 @@ export default function Page() {
         postcode: postcode.trim(),
       });
       setResult(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError("Could not analyze this salon right now. Please try again.");
+      setError(err?.message || "Could not analyze this salon right now. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
+    <>
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
       <section className="border-b border-neutral-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-16 md:px-8 md:py-24">
@@ -110,13 +195,24 @@ export default function Page() {
               </p>
             </div>
 
-            <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm md:p-8">
+            <div
+              id="audit-form"
+              className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm md:p-8"
+            >
               <h2 className="text-2xl font-semibold">Check my salon</h2>
               <p className="mt-2 text-sm text-neutral-500">
                 Enter your salon name and postcode.
               </p>
 
-              <form className="mt-6 space-y-4" onSubmit={handleAnalyze}>
+              <p className="mt-4 text-sm text-neutral-500">
+  No subscription. Just leave your email and we’ll follow up with the right next step.
+</p>
+
+<form
+  className="mt-6 space-y-4"
+  onSubmit={handleLeadSubmit}
+>
+  
                 <div>
                   <label
                     htmlFor="salonName"
@@ -248,6 +344,7 @@ export default function Page() {
             ]}
             cta="Start free"
             featured={false}
+            onClick={scrollToAuditForm}
           />
 
           <PricingCard
@@ -264,6 +361,7 @@ export default function Page() {
             ]}
             cta="Get the full plan"
             featured={true}
+            onClick={() => openLeadModal("plan49")}
           />
         </div>
 
@@ -283,7 +381,11 @@ export default function Page() {
               </p>
             </div>
 
-            <button className="rounded-2xl bg-neutral-900 px-5 py-3 font-semibold text-white transition hover:bg-neutral-800">
+            <button
+              type="button"
+              onClick={() => openLeadModal("done99")}
+              className="rounded-2xl bg-neutral-900 px-5 py-3 font-semibold text-white transition hover:bg-neutral-800"
+            >
               Ask about done-for-you
             </button>
           </div>
@@ -291,6 +393,84 @@ export default function Page() {
       </section>
 
     </main>
+
+      {showLeadModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={closeLeadModal}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl md:p-8"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lead-modal-title"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3
+                  id="lead-modal-title"
+                  className="text-2xl font-bold"
+                >
+                  {modalCopy.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-neutral-600">
+                  {modalCopy.description}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={closeLeadModal}
+                className="rounded-full border border-neutral-200 px-3 py-1 text-sm text-neutral-500 hover:bg-neutral-50"
+              >
+                ✕
+              </button>
+            </div>
+
+            {leadSuccess ? (
+              <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 px-4 py-4 text-sm leading-6 text-green-800">
+                Thanks — we’ve received your details. We’ll contact you with the next steps shortly.
+              </div>
+            ) : (
+              <form
+                className="mt-6 space-y-4"
+                onSubmit={handleLeadSubmit}
+              >
+                <div>
+                  <label
+                    htmlFor="lead-email"
+                    className="mb-2 block text-sm font-medium text-neutral-700"
+                  >
+                    Email address
+                  </label>
+                  <input
+                    id="lead-email"
+                    type="email"
+                    required
+                    value={leadEmail}
+                    onChange={(e) => setLeadEmail(e.target.value)}
+                    placeholder="you@salon.com"
+                    className="w-full rounded-2xl border border-neutral-300 px-4 py-3 outline-none transition focus:border-neutral-900"
+                    autoComplete="email"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={leadSubmitting}
+                  className="w-full rounded-2xl bg-neutral-900 px-5 py-3 font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {leadSubmitting ? "Sending..." : "Send my details"}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -327,6 +507,7 @@ function PricingCard({
   features,
   cta,
   featured,
+  onClick,
 }: {
   title: string;
   price: string;
@@ -334,6 +515,7 @@ function PricingCard({
   features: string[];
   cta: string;
   featured: boolean;
+  onClick?: () => void;
 }) {
   return (
     <div
@@ -375,6 +557,8 @@ function PricingCard({
       </ul>
 
       <button
+        type="button"
+        onClick={onClick}
         className={`mt-8 w-full rounded-2xl px-5 py-3 font-semibold transition ${
           featured
             ? "bg-white text-neutral-900 hover:bg-neutral-100"
